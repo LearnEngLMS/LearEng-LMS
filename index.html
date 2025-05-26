@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LearnEng LMS Login</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; max-width: 500px; margin: auto; }
+    input, select, button { display: block; width: 100%; margin: 10px 0; padding: 10px; font-size: 1em; }
+    .hidden { display: none; }
+    .dashboard { margin-top: 20px; }
+    .stars { font-size: 2em; color: gold; }
+    .log { background: #f3f3f3; padding: 10px; margin-top: 10px; border-radius: 5px; }
+  </style>
+</head>
+<body>
+  <h2>LearnEng LMS Login</h2>
+  <div id="loginForm">
+    <input type="text" id="codeInput" placeholder="Enter your student code" required />
+    <select id="classInput">
+      <option value="">Select your class</option>
+      <option value="5A">5A</option>
+      <option value="5B">5B</option>
+      <option value="6A">6A</option>
+      <option value="6B">6B</option>
+    </select>
+    <button onclick="login()">Login</button>
+  </div>
+
+  <div id="dashboard" class="hidden">
+    <h3>Welcome, <span id="studentName"></span>!</h3>
+    <p>Class: <span id="studentClass"></span></p>
+    <div class="stars">⭐ <span id="starCount">0</span> stars</div>
+    <div class="log">
+      <h4>Rewards</h4>
+      <ul id="rewardsList"></ul>
+      <h4>Penalties</h4>
+      <ul id="penaltiesList"></ul>
+    </div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
+    import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDG1IGyA1GurRmw4xIZxxcZtzHaRJPIiOA",
+      authDomain: "learneng-lms.firebaseapp.com",
+      projectId: "learneng-lms",
+      storageBucket: "learneng-lms.firebasestorage.app",
+      messagingSenderId: "685008553747",
+      appId: "1:685008553747:web:d1fc6c9dc0cf1f9a407ce6"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    window.login = async function () {
+      const code = document.getElementById('codeInput').value.trim();
+      const classInput = document.getElementById('classInput').value;
+      if (!code || !classInput) return alert("Please enter both code and class.");
+
+      const docRef = doc(db, "students", code);
+      const docSnap = await getDoc(docRef);
+
+      if (!docSnap.exists()) {
+        alert("Invalid code. Please try again.");
+        return;
+      }
+
+      const data = docSnap.data();
+      if (data.class !== classInput) {
+        alert("Class mismatch. Please check your class.");
+        return;
+      }
+
+      document.getElementById('loginForm').classList.add('hidden');
+      document.getElementById('dashboard').classList.remove('hidden');
+      document.getElementById('studentName').textContent = data.name;
+      document.getElementById('studentClass').textContent = data.class;
+      document.getElementById('starCount').textContent = data.stars;
+
+      const rewardsList = document.getElementById('rewardsList');
+      const penaltiesList = document.getElementById('penaltiesList');
+      rewardsList.innerHTML = "";
+      penaltiesList.innerHTML = "";
+
+      for (const [key, value] of Object.entries(data.rewards || {})) {
+        const li = document.createElement('li');
+        li.textContent = `${key}: +${value} star(s)`;
+        rewardsList.appendChild(li);
+      }
+
+      for (const [key, value] of Object.entries(data.penalties || {})) {
+        const li = document.createElement('li');
+        li.textContent = `${key}: ${value} star(s)`;
+        penaltiesList.appendChild(li);
+      }
+    }
+  </script>
+</body>
+</html>
