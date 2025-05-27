@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Unit Manager v2 - LearnEng LMS</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; max-width: 700px; margin: auto; }
+    input, select, button { margin: 8px 0; padding: 10px; width: 100%; font-size: 1em; }
+    .form-group { margin-bottom: 15px; }
+    #status { margin-top: 20px; color: green; }
+    .activity-list { margin-top: 20px; }
+    .activity-item { padding: 10px; background: #f0f0f0; margin-bottom: 10px; border-radius: 5px; }
+    .activity-actions button { margin-right: 10px; }
+  </style>
+</head>
+<body>
+  <h2>Unit Manager v2</h2>
+
+  <div class="form-group">
+    <label for="classCode">Class:</label>
+    <select id="classCode">
+      <option value="">Select a class</option>
+      <option>5A</option><option>5B</option>
+      <option>6A</option><option>6B</option>
+      <option>7A</option><option>7B</option>
+      <option>8A</option><option>8B</option>
+    </select>
+  </div>
+
+  <div class="form-group">
+    <label for="unitTitle">Unit Title:</label>
+    <select id="unitTitle">
+      <option value="Unit 1: Friendship">Unit 1: Friendship</option>
+      <option value="Unit 2: Teen Life">Unit 2: Teen Life</option>
+      <option value="Unit 3: In the Kitchen">Unit 3: In the Kitchen</option>
+      <option value="Unit 4: On the Phone">Unit 4: On the Phone</option>
+      <option value="Unit 5: The Internet">Unit 5: The Internet</option>
+      <option value="Unit 6: Adventures">Unit 6: Adventures</option>
+      <option value="Unit 7: Tourism">Unit 7: Tourism</option>
+      <option value="Unit 8: Chores">Unit 8: Chores</option>
+      <option value="Unit 9: Science">Unit 9: Science</option>
+      <option value="Unit 10: Natural Forces">Unit 10: Natural Forces</option>
+    </select>
+  </div>
+
+  <div class="form-group">
+    <label for="activityType">Activity Type:</label>
+    <select id="activityType">
+      <option value="Videos">Videos</option>
+      <option value="Presentations">Presentations</option>
+      <option value="Reading">Reading</option>
+      <option value="Writing">Writing</option>
+      <option value="Listening">Listening</option>
+      <option value="Speaking">Speaking</option>
+      <option value="Skill-Based">Skill-Based</option>
+      <option value="Vocabulary">Vocabulary</option>
+      <option value="Quiz">Quiz</option>
+      <option value="Worksheet">Worksheet</option>
+      <option value="Test">Test</option>
+    </select>
+  </div>
+
+  <div class="form-group">
+    <label for="activityTitle">Activity Title:</label>
+    <input type="text" id="activityTitle" placeholder="e.g., Daily Routine Video">
+  </div>
+
+  <div class="form-group">
+    <label for="activityURL">Activity URL:</label>
+    <input type="text" id="activityURL" placeholder="e.g., https://youtube.com/...">
+  </div>
+
+  <button onclick="addActivity()">Add Activity</button>
+  <button onclick="loadActivities()">Load Existing Activities</button>
+
+  <div id="status"></div>
+  <div class="activity-list" id="activityList"></div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
+    import {
+      getFirestore, doc, getDoc, setDoc, updateDoc,
+      deleteField, arrayUnion, getDocs, collection
+    } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDG1IGyA1GurRmw4xIZxxcZtzHaRJPIiOA",
+      authDomain: "learneng-lms.firebaseapp.com",
+      projectId: "learneng-lms",
+      storageBucket: "learneng-lms.firebasestorage.app",
+      messagingSenderId: "685008553747",
+      appId: "1:685008553747:web:d1fc6c9dc0cf1f9a407ce6"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    let currentItems = [];
+
+    window.addActivity = async function () {
+      const classCode = document.getElementById('classCode').value;
+      const unitTitle = document.getElementById('unitTitle').value;
+      const activityType = document.getElementById('activityType').value;
+      const activityTitle = document.getElementById('activityTitle').value.trim();
+      const activityURL = document.getElementById('activityURL').value.trim();
+
+      if (!classCode || !unitTitle || !activityTitle || !activityURL) {
+        document.getElementById('status').textContent = "Please fill in all fields.";
+        return;
+      }
+
+      const docRef = doc(db, `units_${classCode}`, unitTitle);
+      const docSnap = await getDoc(docRef);
+      const activity = { title: activityTitle, url: activityURL };
+
+      if (docSnap.exists()) {
+        const updates = {};
+        updates[`activityTypes.${activityType}`] = arrayUnion(activity);
+        await updateDoc(docRef, updates);
+      } else {
+        const newData = {
+          unit: unitTitle,
+          activityTypes: {
+            [activityType]: [activity]
+          }
+        };
+        await setDoc(docRef, newData);
+      }
+
+      document.getElementById('status').textContent = `✔️ Activity added to ${unitTitle} (${classCode})`;
+      document.getElementById('activityTitle').value = "";
+      document.getElementById('activityURL').value = "";
+      loadActivities();
+    };
+
+    window.loadActivities = async function () {
+      const classCode = document.getElementById('classCode').value;
+      const unitTitle = document.getElementById('unitTitle').value;
+      const activityType = document.getElementById('activityType').value;
+      const docRef = doc(db, `units_${classCode}`, unitTitle);
+      const docSnap = await getDoc(docRef);
+      const container = document.getElementById("activityList");
+      container.innerHTML = "";
+
+      if (!docSnap.exists()) return;
+
+      const data = docSnap.data();
+      currentItems = data.activityTypes?.[activityType] || [];
+
+      currentItems.forEach((item, i) => {
+        const div = document.createElement("div");
+        div.className = "activity-item";
+        div.innerHTML = `
+          <div id="display-${i}">
+            <strong>${item.title}</strong><br>
+            <a href="${item.url}" target="_blank">${item.url}</a><br>
+            <div class="activity-actions">
+              <button onclick="editActivity(${i})">✏️ Edit</button>
+              <button onclick="deleteActivity(${i})">🗑️ Delete</button>
+              <button onclick="sendAsHomework(${i})">📩 Send as Homework</button>
+            </div>
+          </div>
+          <div id="edit-${i}" style="display:none">
+            <input type="text" id="title-${i}" value="${item.title}" />
+            <input type="text" id="url-${i}" value="${item.url}" />
+            <button onclick="saveEdit(${i})">💾 Save</button>
+          </div>
+        `;
+        container.appendChild(div);
+      });
+    };
+
+    window.editActivity = function (index) {
+      document.getElementById(`display-${index}`).style.display = 'none';
+      document.getElementById(`edit-${index}`).style.display = 'block';
+    };
+
+    window.saveEdit = async function (index) {
+      const title = document.getElementById(`title-${index}`).value.trim();
+      const url = document.getElementById(`url-${index}`).value.trim();
+      const classCode = document.getElementById('classCode').value;
+      const unitTitle = document.getElementById('unitTitle').value;
+      const activityType = document.getElementById('activityType').value;
+      const docRef = doc(db, `units_${classCode}`, unitTitle);
+      currentItems[index] = { title, url };
+      await updateDoc(docRef, { [`activityTypes.${activityType}`]: currentItems });
+      document.getElementById("status").textContent = "✔️ Activity updated.";
+      loadActivities();
+    };
+
+    window.deleteActivity = async function (index) {
+      const classCode = document.getElementById('classCode').value;
+      const unitTitle = document.getElementById('unitTitle').value;
+      const activityType = document.getElementById('activityType').value;
+      const docRef = doc(db, `units_${classCode}`, unitTitle);
+      currentItems.splice(index, 1);
+      await updateDoc(docRef, { [`activityTypes.${activityType}`]: currentItems });
+      document.getElementById("status").textContent = "🗑️ Activity deleted.";
+      loadActivities();
+    };
+
+    window.sendAsHomework = async function (index) {
+      const classCode = document.getElementById('classCode').value;
+      const unitTitle = document.getElementById('unitTitle').value;
+      const activityType = document.getElementById('activityType').value;
+      const docRef = doc(db, `units_${classCode}`, unitTitle);
+      const docSnap = await getDoc(docRef);
+
+      if (!docSnap.exists()) return;
+
+      const activity = docSnap.data().activityTypes?.[activityType]?.[index];
+      if (!activity) return;
+
+      const message = `${activity.title} - ${activity.url}`;
+      const studentQuery = await getDocs(collection(db, "students"));
+      studentQuery.forEach(async (docSnap) => {
+        const student = docSnap.data();
+        if (student.class === classCode) {
+          await updateDoc(doc(db, "students", docSnap.id), {
+            homework: arrayUnion(message)
+          });
+        }
+      });
+      document.getElementById("status").textContent = "📩 Homework sent to all in " + classCode;
+    };
+  </script>
+</body>
+</html>
