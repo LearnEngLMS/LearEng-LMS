@@ -1,0 +1,144 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Class 5B - LearnEng LMS</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: auto; }
+    .section { margin-bottom: 40px; }
+    .wall-post, .homework-item { background: #f0f0f0; padding: 10px; border-radius: 8px; margin-bottom: 10px; }
+    input, textarea, button { width: 100%; padding: 10px; margin: 5px 0; font-size: 1em; }
+    .stars { font-size: 1.3em; margin-bottom: 10px; color: #f4b400; }
+  </style>
+</head>
+<body>
+  <h1>Class 5B Dashboard</h1>
+
+  <div class="section">
+    <div id="starBalance" class="stars">⭐ Loading stars...</div>
+  </div>
+
+  <div class="section">
+    <h2>📢 Announcements</h2>
+    <div id="announcements">Loading...</div>
+  </div>
+
+  <div class="section">
+    <h2>📂 Homework</h2>
+    <div id="homework">Loading...</div>
+  </div>
+
+  <div class="section">
+    <h2>🧱 Units & Activities</h2>
+    <div id="units">Loading activities...</div>
+  </div>
+
+  <div class="section">
+    <h2>💬 Class Wall</h2>
+    <input type="text" id="wallName" placeholder="Your name" />
+    <textarea id="wallMessage" placeholder="Write a message..."></textarea>
+    <button onclick="postMessage()">Post to Wall</button>
+    <div id="wall"></div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
+    import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, doc, getDoc, updateDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDG1IGyA1GurRmw4xIZxxcZtzHaRJPIiOA",
+      authDomain: "learneng-lms.firebaseapp.com",
+      projectId: "learneng-lms",
+      storageBucket: "learneng-lms.firebasestorage.app",
+      messagingSenderId: "685008553747",
+      appId: "1:685008553747:web:d1fc6c9dc0cf1f9a407ce6"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    const studentId = localStorage.getItem("studentId") || "5B420";
+    const classCode = localStorage.getItem("classCode") || "5B";
+
+    async function postMessage() {
+      const name = document.getElementById("wallName").value.trim();
+      const message = document.getElementById("wallMessage").value.trim();
+      if (!name || !message) return alert("Please enter both name and message.");
+      await addDoc(collection(db, `wall_${classCode}`), {
+        name,
+        message,
+        timestamp: new Date()
+      });
+      document.getElementById("wallMessage").value = "";
+    }
+
+    const wallDiv = document.getElementById("wall");
+    const wallQuery = query(collection(db, `wall_${classCode}`), orderBy("timestamp", "desc"));
+    onSnapshot(wallQuery, (snapshot) => {
+      wallDiv.innerHTML = "";
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        const div = document.createElement("div");
+        div.className = "wall-post";
+        div.innerHTML = `<strong>${data.name}</strong><br>${data.message}`;
+        wallDiv.appendChild(div);
+      });
+    });
+
+    const annDiv = document.getElementById("announcements");
+    const annQuery = query(collection(db, `announcements_${classCode}`), orderBy("timestamp", "desc"));
+    onSnapshot(annQuery, (snapshot) => {
+      annDiv.innerHTML = "";
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        const div = document.createElement("div");
+        div.className = "wall-post";
+        div.innerHTML = `${data.message}`;
+        annDiv.appendChild(div);
+      });
+    });
+
+    async function loadHomework() {
+      const hwDiv = document.getElementById("homework");
+      const studentRef = doc(db, "students", studentId);
+      const snap = await getDoc(studentRef);
+      if (!snap.exists()) return hwDiv.textContent = "No homework found.";
+
+      const data = snap.data();
+      const assigned = data.homework || [];
+      const completed = data.homeworkDone || [];
+
+      hwDiv.innerHTML = "";
+      assigned.forEach(msg => {
+        const isDone = completed.includes(msg);
+        const div = document.createElement("div");
+        div.className = "homework-item";
+        div.innerHTML = `
+          ${msg}<br>
+          ${isDone ? "✅ Done" : `<button onclick='markDone("${msg}")'>Mark as Done</button>`}
+        `;
+        hwDiv.appendChild(div);
+      });
+    }
+
+    async function markDone(msg) {
+      const ref = doc(db, "students", studentId);
+      await updateDoc(ref, { homeworkDone: arrayUnion(msg) });
+      loadHomework();
+    }
+
+    async function loadStars() {
+      const ref = doc(db, "students", studentId);
+      const snap = await getDoc(ref);
+      const data = snap.exists() ? snap.data() : {};
+      const stars = data.stars || 0;
+      document.getElementById("starBalance").textContent = `⭐ You have ${stars} star${stars === 1 ? "" : "s"}`;
+    }
+
+    loadHomework();
+    loadStars();
+  </script>
+</body>
+</html>
